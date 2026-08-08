@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-stone-50 text-stone-800;
+  }
+  /* visible keyboard focus everywhere, per accessibility floor */
+  :focus-visible {
+    outline: 2px solid theme('colors.teal.600');
+    outline-offset: 2px;
+  }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-toast-in {
+  animation: toast-in 220ms ease-out;
+}
