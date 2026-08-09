@@ -18,7 +18,7 @@ export function isEmptyNote(note) {
 
 // What gets copied to the clipboard for the 1-click copy action.
 export function copyableText(note) {
-  const title = note.title?.trim();
+  const title = ''; //note.title?.trim();
   const description = note.description?.trim() || '';
   return title ? `${title}\n${description}` : description;
 }
