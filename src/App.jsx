@@ -11,6 +11,7 @@ import Login from './pages/Login';
 import SharedNote from './pages/SharedNote';
 import { useAuthStore } from './store/authStore';
 import { useNotesStore } from './store/notesStore';
+import { useGroupsStore } from './store/groupsStore';
 
 function AppLayout() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
   const user = useAuthStore((s) => s.user);
   const guestId = useAuthStore((s) => s.guestId);
   const initNotes = useNotesStore((s) => s.init);
+  const initGroups = useGroupsStore((s) => s.init);
 
   // Runs once — checks for an existing Supabase session and falls
   // back to guest mode. See store/authStore.js.
@@ -35,13 +37,19 @@ export default function App() {
     init();
   }, [init]);
 
-  // Whenever the "owner" of the notes changes (guest -> signed in,
-  // signed in -> signed out, or first load), point the notes store at
-  // the right local cache. See store/notesStore.js.
+  // Whenever the "owner" of the data changes (guest -> signed in,
+  // signed in -> signed out, or first load), point both the notes and
+  // groups stores at the right local cache. See store/notesStore.js
+  // and store/groupsStore.js.
   useEffect(() => {
-    if (status === 'authenticated' && user) initNotes(user.id, false);
-    else if (status === 'guest' && guestId) initNotes(guestId, true);
-  }, [status, user, guestId, initNotes]);
+    if (status === 'authenticated' && user) {
+      initNotes(user.id, false);
+      initGroups(user.id, false);
+    } else if (status === 'guest' && guestId) {
+      initNotes(guestId, true);
+      initGroups(guestId, true);
+    }
+  }, [status, user, guestId, initNotes, initGroups]);
 
   return (
     <>

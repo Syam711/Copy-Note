@@ -15,6 +15,9 @@ import {
   Search,
   CheckSquare,
   CheckCircle2,
+  Eye,
+  EyeOff,
+  Layers,
 } from 'lucide-react';
 
 // Every icon used anywhere in the app is registered here, once. To
@@ -39,4 +42,7 @@ export const ICONS = {
   search: Search,
   select: CheckSquare,
   check: CheckCircle2,
+  eye: Eye,
+  eyeOff: EyeOff,
+  group: Layers,
 };

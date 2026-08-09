@@ -1,0 +1,23 @@
+/* The note editor's FLIP-style open/close animation. Geometry
+   (top/left/width/height) is necessarily computed in JS — it depends
+   on where the clicked card actually is and the viewport size, which
+   CSS has no access to. But the TIMING of how it moves between those
+   values is pure style, so it lives here instead of as a string built
+   in a component. */
+
+.editor-panel {
+  transition: top 380ms cubic-bezier(0.22, 1, 0.36, 1), left 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 380ms cubic-bezier(0.22, 1, 0.36, 1), height 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Applied only on the first paint after mount, so the browser has a
+   collapsed (card-sized) state to animate FROM — without this, there'd
+   be nothing to transition and the panel would just appear full-size. */
+.editor-panel--no-transition {
+  transition: none;
+}
+
+.editor-panel-content {
+  transition: opacity 200ms ease;
+}

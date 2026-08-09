@@ -80,6 +80,7 @@ export const useNotesStore = create((set, get) => ({
   restoreNote: (id) => get().updateNote(id, { deleted_at: null }),
   togglePin: (id, next) => get().updateNote(id, { is_pinned: next }),
   toggleArchive: (id, next) => get().updateNote(id, { is_archived: next }),
+  toggleHidden: (id, next) => get().updateNote(id, { is_hidden: next }),
 
   // Manual "delete forever" from the Trash page — the 30-day version
   // of this happens automatically server-side via pg_cron instead.

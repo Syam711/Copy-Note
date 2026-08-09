@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react';
 import NoteGrid from '../components/notes/NoteGrid';
 import NoteEditor from '../components/notes/NoteEditor';
+import GroupOpenView from '../components/notes/GroupOpenView';
 import TitleFilter from '../components/notes/TitleFilter';
 import BulkActionBar from '../components/notes/BulkActionBar';
 import Icon from '../components/icons/Icon';
 import { useNotesStore } from '../store/notesStore';
+import { useGroupsStore } from '../store/groupsStore';
 import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
 import { useSelection } from '../hooks/useSelection';
-import { filterActive, displayTitle } from '../utils/noteHelpers';
+import { filterActive, filterActiveGroups, displayTitle, mergeNotesAndGroups } from '../utils/noteHelpers';
 import { createShare, shareUrl } from '../api/share.api';
 
 export default function Home() {
@@ -16,50 +18,95 @@ export default function Home() {
   const loading = useNotesStore((s) => s.loading);
   const trashNote = useNotesStore((s) => s.trashNote);
   const toggleArchive = useNotesStore((s) => s.toggleArchive);
+
+  const allGroups = useGroupsStore((s) => s.groups);
+  const toggleGroupArchive = useGroupsStore((s) => s.toggleArchive);
+  const formGroupFromSelection = useGroupsStore((s) => s.formGroupFromSelection);
+  const ungroup = useGroupsStore((s) => s.ungroup);
+
   const showToast = useToastStore((s) => s.showToast);
   const user = useAuthStore((s) => s.user);
   const isGuest = useAuthStore((s) => s.status === 'guest');
 
   const [openNote, setOpenNote] = useState(null);
+  const [openGroup, setOpenGroup] = useState(null);
   const [query, setQuery] = useState('');
   const selection = useSelection();
 
-  // Filters against the same title-or-first-lines text the card
-  // itself displays, not just the raw title field — otherwise a note
-  // with no title could never be found even though it clearly shows
-  // text where a title would go.
-  const notes = useMemo(() => {
-    const active = filterActive(allNotes);
-    if (!query.trim()) return active;
+  const items = useMemo(() => {
+    const activeNotes = filterActive(allNotes);
+    const activeGroups = filterActiveGroups(allGroups);
+    const merged = mergeNotesAndGroups(activeNotes, activeGroups, allNotes);
+    if (!query.trim()) return merged;
     const q = query.trim().toLowerCase();
-    return active.filter((n) => displayTitle(n).toLowerCase().includes(q));
-  }, [allNotes, query]);
+    return merged.filter((item) =>
+      item.type === 'note' ? displayTitle(item.note).toLowerCase().includes(q) : item.group.title.toLowerCase().includes(q)
+    );
+  }, [allNotes, allGroups, query]);
 
-  const plural = (n) => `${n} note${n === 1 ? '' : 's'}`;
+  // Classify the current selection so bulk actions can be enabled per
+  // the composition rules worked out in the architecture discussion.
+  const selectedNoteIds = useMemo(
+    () => Array.from(selection.selectedIds).filter((id) => allNotes.some((n) => n.id === id)),
+    [selection.selectedIds, allNotes]
+  );
+  const selectedGroupIds = useMemo(
+    () => Array.from(selection.selectedIds).filter((id) => allGroups.some((g) => g.id === id)),
+    [selection.selectedIds, allGroups]
+  );
+  const hasNotes = selectedNoteIds.length > 0;
+  const hasGroups = selectedGroupIds.length > 0;
+  const mixed = hasNotes && hasGroups;
+
+  const plural = (n) => `${n} item${n === 1 ? '' : 's'}`;
 
   const handleBulkArchive = () => {
-    selection.selectedIds.forEach((id) => toggleArchive(id, true));
+    selectedNoteIds.forEach((id) => toggleArchive(id, true));
+    selectedGroupIds.forEach((id) => toggleGroupArchive(id, true));
     showToast('archive', plural(selection.count));
     selection.exit();
   };
 
-  const handleBulkDelete = () => {
-    selection.selectedIds.forEach((id) => trashNote(id));
-    showToast('delete', plural(selection.count));
+  const handleBulkGroup = () => {
+    formGroupFromSelection(selectedNoteIds, selectedGroupIds);
     selection.exit();
   };
 
+  // Notes-only -> trash them. Groups-only -> ungroup them. Mixed is
+  // unreachable here (the button isn't rendered), but guarded anyway.
+  const handleBulkDelete = () => {
+    if (mixed) return;
+    if (hasGroups) {
+      selectedGroupIds.forEach((id) => ungroup(id));
+      showToast('ungroup', plural(selectedGroupIds.length));
+    } else {
+      selectedNoteIds.forEach((id) => trashNote(id));
+      showToast('delete', plural(selectedNoteIds.length));
+    }
+    selection.exit();
+  };
+
+  // A single group, or any number of individual notes — never mixed,
+  // never multiple groups. See handleBulkShare's caller for how the
+  // button itself is conditionally rendered to match this.
   const handleBulkShare = async () => {
     if (isGuest) {
       showToast('shareRequiresAccount');
       return;
     }
-    const targets = notes.filter((n) => selection.selectedIds.has(n.id));
     try {
-      const shares = await Promise.all(targets.map((n) => createShare(n, user)));
-      const links = shares.map((s) => shareUrl(s.share_token)).join('\n');
-      await navigator.clipboard.writeText(links);
-      showToast('bulkShare', shares.length);
+      if (selectedGroupIds.length === 1) {
+        const group = allGroups.find((g) => g.id === selectedGroupIds[0]);
+        const members = allNotes.filter((n) => n.group_id === group.id);
+        const share = await createShare(members, user, group.title);
+        await navigator.clipboard.writeText(shareUrl(share.share_token));
+        showToast('share', group.title);
+      } else {
+        const targets = allNotes.filter((n) => selectedNoteIds.includes(n.id));
+        const share = await createShare(targets, user, null);
+        await navigator.clipboard.writeText(shareUrl(share.share_token));
+        showToast('share', plural(targets.length));
+      }
     } catch (err) {
       console.error('Bulk share failed:', err);
     }
@@ -93,28 +140,30 @@ export default function Home() {
         <p className="text-stone-400 text-sm">Loading your notes…</p>
       ) : (
         <NoteGrid
-          notes={notes}
+          items={items}
           onOpenNote={(note, rect) => setOpenNote({ note, rect })}
+          onOpenGroup={(group, rect) => setOpenGroup({ group, rect })}
           selectionMode={selection.active}
           selectedIds={selection.selectedIds}
           onToggleSelect={selection.toggle}
-          emptyMessage={query ? 'No notes match that title.' : "No notes yet — click 'Take a note…' to add one."}
+          emptyMessage={query ? 'Nothing matches that title.' : "No notes yet — click 'Take a note…' to add one."}
         />
       )}
 
       {openNote && (
-        <NoteEditor
-          note={openNote.note}
-          originRect={openNote.rect}
-          onClose={() => setOpenNote(null)}
-        />
+        <NoteEditor note={openNote.note} originRect={openNote.rect} onClose={() => setOpenNote(null)} />
+      )}
+      {openGroup && (
+        <GroupOpenView group={openGroup.group} originRect={openGroup.rect} onClose={() => setOpenGroup(null)} />
       )}
 
       <BulkActionBar
         count={selection.count}
         onArchive={handleBulkArchive}
-        onShare={handleBulkShare}
-        onDelete={handleBulkDelete}
+        onGroup={handleBulkGroup}
+        onDelete={mixed ? undefined : handleBulkDelete}
+        deleteLabel={hasGroups && !hasNotes ? 'Ungroup' : 'Delete'}
+        onShare={!mixed && selectedGroupIds.length <= 1 ? handleBulkShare : undefined}
         onCancel={selection.exit}
       />
     </div>

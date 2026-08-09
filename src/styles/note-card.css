@@ -1,0 +1,24 @@
+/* Smoothly collapses a note's description to zero height using the
+   grid-template-rows trick, which — unlike animating max-height —
+   works correctly for content of any length without guessing a value. */
+.note-description-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 250ms ease;
+}
+.note-description-collapse.is-hidden {
+  grid-template-rows: 0fr;
+}
+.note-description-collapse > * {
+  overflow: hidden;
+}
+
+/* Re-triggered each toggle by changing the icon's `key`, which makes
+   React remount it and restarts this animation. */
+@keyframes icon-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.icon-pop {
+  animation: icon-pop 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}

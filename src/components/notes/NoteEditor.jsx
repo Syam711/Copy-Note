@@ -121,11 +121,7 @@ export default function NoteEditor({ note, originRect, onClose }) {
     : { top: vh / 2 - 40, left: vw / 2 - 140, width: 280, height: 80, borderRadius: 16 }; // fallback: bloom from center
 
   const geometry = phase === 'open' ? expanded : collapsed;
-  const panelStyle = {
-    position: 'fixed',
-    ...geometry,
-    transition: phase === 'enter' ? 'none' : `all ${TRANSITION_MS}ms cubic-bezier(0.22,1,0.36,1)`,
-  };
+  const panelStyle = { position: 'fixed', ...geometry };
 
   return (
     <div className="fixed inset-0 z-40">
@@ -140,7 +136,7 @@ export default function NoteEditor({ note, originRect, onClose }) {
         aria-modal="true"
         aria-label={note ? 'Edit note' : 'New note'}
         style={panelStyle}
-        className="bg-stone-50 shadow-2xl overflow-hidden flex flex-col"
+        className={`editor-panel bg-stone-50 shadow-2xl overflow-hidden flex flex-col ${phase === 'enter' ? 'editor-panel--no-transition' : ''}`}
       >
         <div
           className="flex items-center justify-end gap-1 px-3 pt-3 shrink-0 transition-opacity"

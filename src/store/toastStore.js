@@ -13,6 +13,7 @@ export const TOAST_CONFIG = {
   shareRequiresAccount: { icon: 'lock', message: () => 'Sign in to share notes' },
   unshare: { icon: 'trash', message: (title) => `Stopped sharing "${title}"` },
   bulkShare: { icon: 'share', message: (n) => `Created ${n} share link${n === 1 ? '' : 's'}` },
+  ungroup: { icon: 'trash', message: (title) => `Ungrouped "${title}"` },
 };
 
 export const useToastStore = create((set) => ({

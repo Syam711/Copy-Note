@@ -13,7 +13,15 @@ import { createShare, shareUrl } from '../../api/share.api';
 
 const CLICK_DEBOUNCE_MS = 220; // gives a second click time to arrive before treating the first as final
 
-export default function NoteCard({ note, onOpen, selectionMode = false, selected = false, onToggleSelect }) {
+export default function NoteCard({
+  note,
+  onOpen,
+  selectionMode = false,
+  selected = false,
+  onToggleSelect,
+  inGroupView = false,
+  onRemoveFromGroup,
+}) {
   const cardRef = useRef(null);
   const menuRef = useRef(null);
   const clickTimer = useRef(null);
@@ -22,6 +30,7 @@ export default function NoteCard({ note, onOpen, selectionMode = false, selected
 
   const trashNote = useNotesStore((s) => s.trashNote);
   const toggleArchive = useNotesStore((s) => s.toggleArchive);
+  const toggleHidden = useNotesStore((s) => s.toggleHidden);
   const showToast = useToastStore((s) => s.showToast);
   const user = useAuthStore((s) => s.user);
   const isGuest = useAuthStore((s) => s.status === 'guest');
@@ -90,8 +99,12 @@ export default function NoteCard({ note, onOpen, selectionMode = false, selected
 
   const handleContextMenu = useCallback((e) => {
     e.preventDefault(); // no native browser menu — see architecture notes on this trade-off
-    triggerOpen();
-  }, [triggerOpen]);
+    if (selectionMode) {
+      onToggleSelect(note.id);
+      return;
+    }
+    setMenuOpen(true);
+  }, [selectionMode, onToggleSelect, note.id]);
 
   const handleMouseLeave = useCallback(() => {
     tilt.onMouseLeave();
@@ -157,55 +170,90 @@ export default function NoteCard({ note, onOpen, selectionMode = false, selected
           level in avoids that entirely. */}
       <div
         style={tilt.style}
-        className={`rounded-2xl p-4 min-h-[9rem] will-change-transform ${colorForNote(note.id)} ${selected ? 'ring-2 ring-teal-600' : ''}`}
+        className={`tilt-card rounded-2xl p-4 will-change-transform transition-[min-height] duration-300 ease-out ${
+          note.is_hidden ? 'min-h-[3rem]' : 'min-h-[9rem]'
+        } ${colorForNote(note.id)} ${selected ? 'ring-2 ring-teal-600' : ''}`}
       >
         {note.title?.trim() && (
           <p className="font-medium text-stone-800 text-sm mb-1 line-clamp-1 pr-6">{note.title}</p>
         )}
-        <p className={`text-stone-700 text-sm leading-relaxed line-clamp-5 pr-6 ${note.title?.trim() ? '' : 'font-medium'}`}>
-          {note.description}
-        </p>
+        {/* Untitled notes normally show their description styled as a
+            title (see the else-branch below). Hidden, that description
+            is about to collapse away — so this stands in as the title
+            using the same title-or-first-lines text the card would
+            otherwise fall back to. */}
+        {!note.title?.trim() && note.is_hidden && (
+          <p className="font-medium text-stone-800 text-sm mb-1 line-clamp-1 pr-6">{title}</p>
+        )}
+        <div className={`note-description-collapse pr-6 ${note.is_hidden ? 'is-hidden' : ''}`}>
+          <div>
+            <p className={`text-stone-700 text-sm leading-relaxed line-clamp-5 ${note.title?.trim() ? '' : 'font-medium'}`}>
+              {note.description}
+            </p>
+          </div>
+        </div>
       </div>
 
-      {selectionMode ? (
+      {selectionMode && (
         <div
           aria-hidden="true"
-          className={`absolute top-3 left-3 w-6 h-6 rounded-full flex items-center justify-center border-2 ${
+          className={`absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center border-2 ${
             selected ? 'bg-teal-600 border-teal-600' : 'bg-white/80 border-stone-300'
           }`}
         >
-          {selected && <Icon name="check" size={14} className="text-white" />}
+          {selected && <Icon name="check" size={12} className="text-white" />}
         </div>
-      ) : (
-        note.is_pinned && <Icon name="pin" size={13} className="absolute top-3 left-3 text-stone-500" />
+      )}
+      {!selectionMode && note.is_pinned && (
+        <Icon name="pin" size={13} className="absolute top-3 left-3 text-stone-500" />
       )}
 
       {!selectionMode && (
         <div
-          ref={menuRef}
-          className={`absolute top-2 right-2 transition-opacity duration-200 ${menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-40 hover:!opacity-100'}`}
+          className={`absolute top-2 right-2 flex items-center gap-1 transition-opacity duration-200 ${
+            menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-40 hover:!opacity-100'
+          }`}
         >
           <button
             type="button"
-            aria-label="Note options"
-            onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
+            aria-label={note.is_hidden ? 'Show description' : 'Hide description'}
+            onClick={(e) => { e.stopPropagation(); toggleHidden(note.id, !note.is_hidden); }}
             className="p-1.5 rounded-full bg-white/70 hover:bg-white text-stone-600"
           >
-            <Icon name="more" size={15} />
+            <Icon key={note.is_hidden ? 'closed' : 'open'} name={note.is_hidden ? 'eyeOff' : 'eye'} size={15} className="icon-pop" />
           </button>
 
-          {menuOpen && (
-            <div className="absolute top-9 right-0 w-36 rounded-xl bg-white shadow-lg border border-stone-200 py-1 text-sm z-10">
-              <MenuItem icon="edit" label="Edit" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); triggerOpen(); }} />
-              <MenuItem icon="share" label="Share" onClick={handleShare} />
-              <MenuItem
-                icon={note.is_archived ? 'restore' : 'archive'}
-                label={note.is_archived ? 'Unarchive' : 'Archive'}
-                onClick={handleArchiveToggle}
-              />
-              <MenuItem icon="trash" label="Delete" tone="danger" onClick={handleDelete} />
-            </div>
-          )}
+          <div ref={menuRef} className="relative">
+            <button
+              type="button"
+              aria-label="Note options"
+              onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
+              className="p-1.5 rounded-full bg-white/70 hover:bg-white text-stone-600"
+            >
+              <Icon name="more" size={15} />
+            </button>
+
+            {menuOpen && (
+              <div className="absolute top-9 right-0 w-40 rounded-xl bg-white shadow-lg border border-stone-200 py-1 text-sm z-10">
+                <MenuItem icon="edit" label="Edit" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); triggerOpen(); }} />
+                <MenuItem icon="share" label="Share" onClick={handleShare} />
+                {inGroupView ? (
+                  <MenuItem
+                    icon="close"
+                    label="Remove from group"
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRemoveFromGroup(note.id); }}
+                  />
+                ) : (
+                  <MenuItem
+                    icon={note.is_archived ? 'restore' : 'archive'}
+                    label={note.is_archived ? 'Unarchive' : 'Archive'}
+                    onClick={handleArchiveToggle}
+                  />
+                )}
+                <MenuItem icon="trash" label="Delete" tone="danger" onClick={handleDelete} />
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

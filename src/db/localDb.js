@@ -8,15 +8,16 @@ import Dexie from 'dexie';
 export const db = new Dexie('notesApp');
 
 db.version(1).stores({
-  // '&id' = primary key, must be unique. The other fields listed are
-  // indexed so we can query by them directly instead of scanning
-  // every row — e.g. notes.where('is_archived').equals(1).
   notes: '&id, user_id, is_pinned, is_archived, deleted_at, updated_at',
+  pendingWrites: '&id, noteId, createdAt',
+});
 
-  // Local-only bookkeeping: writes made while offline (or just
-  // optimistically, before the server confirms) that still need to
-  // reach Supabase. The sync engine drains this queue in the
-  // background — see hooks/useLocalSync.js.
+// v2: groups. Dexie migrates existing local databases to this
+// automatically on next load — no data loss, it just adds the new
+// index and table.
+db.version(2).stores({
+  notes: '&id, user_id, is_pinned, is_archived, deleted_at, updated_at, group_id',
+  groups: '&id, user_id, is_archived, updated_at',
   pendingWrites: '&id, noteId, createdAt',
 });
 

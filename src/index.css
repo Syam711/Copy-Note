@@ -1,3 +1,8 @@
+@import './styles/tilt.css';
+@import './styles/note-editor.css';
+@import './styles/note-card.css';
+@import './styles/group-card.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
