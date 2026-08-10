@@ -96,7 +96,7 @@ export default function NoteEditor({ note, originRect, onClose }) {
       return;
     }
     try {
-      const share = await createShare({ ...note, title, description }, user);
+      const share = await createShare([{ ...note, title, description }], user);
       await navigator.clipboard.writeText(shareUrl(share.share_token));
       showToast('share', displayTitle(note));
     } catch (err) {

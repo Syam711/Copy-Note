@@ -138,7 +138,7 @@ export default function NoteCard({
       return;
     }
     try {
-      const share = await createShare(note, user);
+      const share = await createShare([note], user);
       await navigator.clipboard.writeText(shareUrl(share.share_token));
       showToast('share', title);
     } catch (err) {
@@ -186,11 +186,9 @@ export default function NoteCard({
           <p className="font-medium text-stone-800 text-sm mb-1 line-clamp-1 pr-6">{title}</p>
         )}
         <div className={`note-description-collapse pr-6 ${note.is_hidden ? 'is-hidden' : ''}`}>
-          <div>
-            <p className={`text-stone-700 text-sm leading-relaxed line-clamp-5 ${note.title?.trim() ? '' : 'font-medium'}`}>
-              {note.description}
-            </p>
-          </div>
+          <p className={`text-stone-700 text-sm leading-relaxed line-clamp-5 ${note.title?.trim() ? '' : 'font-medium'}`}>
+            {note.description}
+          </p>
         </div>
       </div>
 

@@ -1,16 +1,20 @@
-/* Smoothly collapses a note's description to zero height using the
-   grid-template-rows trick, which — unlike animating max-height —
-   works correctly for content of any length without guessing a value. */
+/* Smoothly collapses a note's description. Deliberately NOT the
+   grid-template-rows: 1fr/0fr trick — that technique has a real,
+   documented bad interaction with -webkit-line-clamp (what
+   line-clamp-5 uses): browsers can miscompute the intrinsic size of
+   a -webkit-box child inside a 1fr grid track, collapsing content
+   that shouldn't be collapsed. max-height doesn't have that problem;
+   500px is just a ceiling well above what 5 clamped lines ever reach,
+   so the transition still reads as a clean collapse. */
 .note-description-collapse {
-  display: grid;
-  grid-template-rows: 1fr;
-  transition: grid-template-rows 250ms ease;
+  max-height: 500px;
+  overflow: hidden;
+  opacity: 1;
+  transition: max-height 250ms ease, opacity 200ms ease;
 }
 .note-description-collapse.is-hidden {
-  grid-template-rows: 0fr;
-}
-.note-description-collapse > * {
-  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
 }
 
 /* Re-triggered each toggle by changing the icon's `key`, which makes

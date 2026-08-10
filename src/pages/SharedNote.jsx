@@ -12,7 +12,10 @@ export default function SharedNote() {
   useEffect(() => {
     fetchShareByToken(token)
       .then(setShare)
-      .catch(() => setShare(null));
+      .catch((err) => {
+        console.error('Failed to load shared note:', err);
+        setShare(null);
+      });
   }, [token]);
 
   if (share === undefined) {
