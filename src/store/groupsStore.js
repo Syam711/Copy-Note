@@ -54,13 +54,13 @@ export const useGroupsStore = create((set, get) => ({
     await Promise.all(noteIds.map((id) => useNotesStore.getState().updateNote(id, { group_id: groupId })));
   },
 
-  _createGroupWithNotes: async (noteIds) => {
+  _createGroupWithNotes: async (noteIds, titleOverride) => {
     if (noteIds.length === 0) return null;
     const { ownerId, isGuest, groups } = get();
     const group = {
       id: crypto.randomUUID(),
       user_id: ownerId,
-      title: nextGroupName(groups),
+      title: titleOverride || nextGroupName(groups),
       is_pinned: false,
       is_archived: false,
       created_at: new Date().toISOString(),
@@ -100,35 +100,36 @@ export const useGroupsStore = create((set, get) => ({
     }
   },
 
-  // The one entry point the bulk action bar calls for "Group" — which
-  // of the three behaviors applies depends on how many EXISTING
-  // groups are part of the current selection:
-  //   0 groups  -> create a new group from the selected notes
-  //   1 group   -> merge the selected notes into that group
-  //   2+ groups -> dissolve all of them, fold everything into one new group
+  // The one entry point the bulk action bar calls for "Group." Any
+  // existing groups in the selection get unpacked (dissolved) and
+  // everything — their former members plus any loose notes — folds
+  // into one freshly created group. When exactly one existing group
+  // was involved, the new group keeps that group's original title,
+  // so from the outside this looks identical to "adding notes to the
+  // existing group" — it's just implemented as unpack-and-recreate
+  // rather than an in-place update, which is the same mechanism the
+  // 2-or-more-groups case always used. One mechanism, not two.
   formGroupFromSelection: async (noteIds, groupIds) => {
-    if (groupIds.length === 1) {
-      await get()._assignNotesToGroup(noteIds, groupIds[0]);
+    if (groupIds.length === 0) {
+      await get()._createGroupWithNotes(noteIds);
       return;
     }
-    if (groupIds.length >= 2) {
-      const formerMemberIds = useNotesStore
-        .getState()
-        .notes.filter((n) => groupIds.includes(n.group_id))
-        .map((n) => n.id);
-      // eslint-disable-next-line no-restricted-syntax
-      for (const id of groupIds) {
-        // eslint-disable-next-line no-await-in-loop
-        await get()._deleteGroupRow(id);
-      }
-      const combined = [...new Set([...formerMemberIds, ...noteIds])];
-      await get()._createGroupWithNotes(combined);
-      return;
+    const preservedTitle = groupIds.length === 1 ? get().groups.find((g) => g.id === groupIds[0])?.title : null;
+    const formerMemberIds = useNotesStore
+      .getState()
+      .notes.filter((n) => groupIds.includes(n.group_id))
+      .map((n) => n.id);
+    // eslint-disable-next-line no-restricted-syntax
+    for (const id of groupIds) {
+      // eslint-disable-next-line no-await-in-loop
+      await get()._deleteGroupRow(id);
     }
-    await get()._createGroupWithNotes(noteIds);
+    const combined = [...new Set([...formerMemberIds, ...noteIds])];
+    await get()._createGroupWithNotes(combined, preservedTitle);
   },
 
   ungroup: (id) => get()._deleteGroupRow(id),
+  createGroupFromNotes: (noteIds, title) => get()._createGroupWithNotes(noteIds, title),
   renameGroup: (id, title) => get()._updateGroup(id, { title }),
   togglePin: (id, next) => get()._updateGroup(id, { is_pinned: next }),
   toggleArchive: (id, next) => get()._updateGroup(id, { is_archived: next }),

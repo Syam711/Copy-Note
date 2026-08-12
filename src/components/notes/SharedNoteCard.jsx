@@ -6,6 +6,7 @@ import { useToastStore } from '../../store/toastStore';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTilt } from '../../hooks/useTilt';
 import { shareUrl, revokeShare } from '../../api/share.api';
+import { copyableText } from '../../utils/noteHelpers';
 
 // share.notes is always an array now (1-to-many) — group_title is set
 // only when this share came from sharing a whole group.
@@ -19,7 +20,7 @@ export default function SharedNoteCard({ share, onRevoked }) {
   const label = share.group_title || (isBundle ? `${share.notes.length} notes` : share.notes[0]?.title || 'Untitled note');
 
   const handleCopyContent = async () => {
-    const text = share.notes.map((n) => (n.title ? `${n.title}\n${n.description}` : n.description)).join('\n\n');
+    const text = share.notes.map(copyableText).join('\n\n');
     try {
       await navigator.clipboard.writeText(text);
     } catch {

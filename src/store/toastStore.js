@@ -14,6 +14,7 @@ export const TOAST_CONFIG = {
   unshare: { icon: 'trash', message: (title) => `Stopped sharing "${title}"` },
   bulkShare: { icon: 'share', message: (n) => `Created ${n} share link${n === 1 ? '' : 's'}` },
   ungroup: { icon: 'trash', message: (title) => `Ungrouped "${title}"` },
+  import: { icon: 'import', message: (label) => `Imported ${label}` },
 };
 
 export const useToastStore = create((set) => ({
