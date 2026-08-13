@@ -15,6 +15,8 @@ export const TOAST_CONFIG = {
   bulkShare: { icon: 'share', message: (n) => `Created ${n} share link${n === 1 ? '' : 's'}` },
   ungroup: { icon: 'trash', message: (title) => `Ungrouped "${title}"` },
   import: { icon: 'import', message: (label) => `Imported ${label}` },
+  paste: { icon: 'paste', message: () => 'Note created from clipboard' },
+  pasteEmpty: { icon: 'paste', message: () => 'Clipboard is empty' },
 };
 
 export const useToastStore = create((set) => ({

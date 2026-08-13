@@ -5,6 +5,7 @@ import { useNotesStore } from '../../store/notesStore';
 import { useToastStore } from '../../store/toastStore';
 import { useAuthStore } from '../../store/authStore';
 import { useClickOutside } from '../../hooks/useClickOutside';
+import { useMarkdownShortcuts } from '../../hooks/useMarkdownShortcuts';
 import { displayTitle } from '../../utils/noteHelpers';
 import { createShare, shareUrl } from '../../api/share.api';
 
@@ -16,6 +17,7 @@ const TRANSITION_MS = 380;
 export default function NoteEditor({ note, originRect, onClose }) {
   const [title, setTitle] = useState(note?.title || '');
   const [description, setDescription] = useState(note?.description || '');
+  const markdownShortcuts = useMarkdownShortcuts(description, setDescription);
   const [phase, setPhase] = useState('enter'); // 'enter' -> 'open' -> 'exit'
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -181,9 +183,11 @@ export default function NoteEditor({ note, originRect, onClose }) {
             className="w-full shrink-0 font-serif text-xl text-stone-800 placeholder-stone-400 bg-transparent outline-none mb-3"
           />
           <textarea
+            ref={markdownShortcuts.textareaRef}
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Start writing…"
+            onChange={markdownShortcuts.onChange}
+            onKeyDown={markdownShortcuts.onKeyDown}
+            placeholder="Start writing… try '- ' for a list, '- [] ' for a checkbox"
             className="flex-1 w-full resize-none text-stone-700 leading-relaxed placeholder-stone-400 bg-transparent outline-none"
           />
         </div>

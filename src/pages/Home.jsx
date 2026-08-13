@@ -16,6 +16,7 @@ import { createShare, shareUrl } from '../api/share.api';
 export default function Home() {
   const allNotes = useNotesStore((s) => s.notes);
   const loading = useNotesStore((s) => s.loading);
+  const createNote = useNotesStore((s) => s.createNote);
   const trashNote = useNotesStore((s) => s.trashNote);
   const toggleArchive = useNotesStore((s) => s.toggleArchive);
 
@@ -59,6 +60,24 @@ export default function Home() {
   const mixed = hasNotes && hasGroups;
 
   const plural = (n) => `${n} item${n === 1 ? '' : 's'}`;
+
+  // The reverse of 1-click copy: clipboard content becomes a new note
+  // immediately, no editor step in between. navigator.clipboard.readText()
+  // needs a user gesture (this click satisfies that) and, in some
+  // browsers, an explicit read-permission grant the first time.
+  const handlePasteCreate = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) {
+        showToast('pasteEmpty');
+        return;
+      }
+      await createNote({ title: '', description: text });
+      showToast('paste');
+    } catch (err) {
+      console.error('Paste failed — clipboard read may have been denied:', err);
+    }
+  };
 
   const handleBulkArchive = () => {
     selectedNoteIds.forEach((id) => toggleArchive(id, true));
@@ -122,6 +141,14 @@ export default function Home() {
           className="flex-1 sm:flex-none sm:w-72 text-left text-stone-400 text-sm bg-white border border-stone-200 rounded-2xl px-4 py-3 hover:shadow-sm transition-shadow"
         >
           Take a note…
+        </button>
+        <button
+          type="button"
+          onClick={handlePasteCreate}
+          aria-label="Create note from clipboard"
+          className="p-2.5 rounded-full border border-stone-200 bg-white text-stone-500 hover:bg-stone-100 shrink-0"
+        >
+          <Icon name="paste" size={16} />
         </button>
         <TitleFilter query={query} onQueryChange={setQuery} />
         <button

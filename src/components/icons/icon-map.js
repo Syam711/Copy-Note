@@ -19,6 +19,7 @@ import {
   EyeOff,
   Layers,
   Download,
+  Clipboard,
 } from 'lucide-react';
 
 // Every icon used anywhere in the app is registered here, once. To
@@ -47,4 +48,5 @@ export const ICONS = {
   eyeOff: EyeOff,
   group: Layers,
   import: Download,
+  paste: Clipboard,
 };

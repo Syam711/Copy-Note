@@ -1,14 +1,19 @@
+import { stripLineMarker } from './richText';
+
 const PREVIEW_LENGTH = 80;
 
 // Card display rule: show the title if there is one, otherwise the
-// first lines of the description stand in as the title.
+// first line of the description stands in as the title — stripped of
+// any "- " / "- [ ] " marker, so an untitled checklist note doesn't
+// show raw syntax where a title would go.
 export function displayTitle(note) {
   if (note.title?.trim()) return note.title.trim();
-  const flat = (note.description || '').replace(/\s+/g, ' ').trim();
-  if (!flat) return 'Untitled note';
-  return flat.length > PREVIEW_LENGTH
-    ? `${flat.slice(0, PREVIEW_LENGTH)}…`
-    : flat;
+  const firstLine = (note.description || '').split('\n').find((l) => l.trim());
+  const clean = stripLineMarker((firstLine || '').trim());
+  if (!clean) return 'Untitled note';
+  return clean.length > PREVIEW_LENGTH
+    ? `${clean.slice(0, PREVIEW_LENGTH)}…`
+    : clean;
 }
 
 // A note with nothing in either field should never be persisted.

@@ -2,7 +2,9 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import Icon from '../icons/Icon';
 import MenuItem from '../shared/MenuItem';
 import { colorForNote } from './noteColors';
+import RichDescription from './RichDescription';
 import { displayTitle, copyableText } from '../../utils/noteHelpers';
+import { toggleChecklistLine } from '../../utils/richText';
 import { useNotesStore } from '../../store/notesStore';
 import { useToastStore } from '../../store/toastStore';
 import { useAuthStore } from '../../store/authStore';
@@ -31,6 +33,7 @@ export default function NoteCard({
   const trashNote = useNotesStore((s) => s.trashNote);
   const toggleArchive = useNotesStore((s) => s.toggleArchive);
   const toggleHidden = useNotesStore((s) => s.toggleHidden);
+  const updateNote = useNotesStore((s) => s.updateNote);
   const showToast = useToastStore((s) => s.showToast);
   const user = useAuthStore((s) => s.user);
   const isGuest = useAuthStore((s) => s.status === 'guest');
@@ -39,6 +42,14 @@ export default function NoteCard({
   useEffect(() => () => clearTimeout(clickTimer.current), []);
 
   const title = displayTitle(note);
+
+  // Checking an item off doesn't open the editor or count as a copy —
+  // it's its own thing, handled entirely by rewriting that one line
+  // within the description text (see utils/richText.js).
+  const handleToggleChecklist = useCallback(
+    (lineIndex) => updateNote(note.id, { description: toggleChecklistLine(note.description, lineIndex) }),
+    [note.id, note.description, updateNote]
+  );
 
   // Every gesture that would normally open the editor toggles
   // selection instead while selection mode is active — opening an
@@ -186,9 +197,11 @@ export default function NoteCard({
           <p className="font-medium text-stone-800 text-sm mb-1 line-clamp-1 pr-6">{title}</p>
         )}
         <div className={`note-description-collapse pr-6 ${note.is_hidden ? 'is-hidden' : ''}`}>
-          <p className={`text-stone-700 text-sm leading-relaxed line-clamp-5 ${note.title?.trim() ? '' : 'font-medium'}`}>
-            {note.description}
-          </p>
+          <RichDescription
+            description={note.description}
+            interactive={!selectionMode}
+            onToggleChecklist={handleToggleChecklist}
+          />
         </div>
       </div>
 
