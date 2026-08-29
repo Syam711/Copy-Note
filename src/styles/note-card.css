@@ -17,12 +17,81 @@
   opacity: 0;
 }
 
-/* Re-triggered each toggle by changing the icon's `key`, which makes
-   React remount it and restarts this animation. */
+/* Caps how tall a note card can grow on the grid — instead of a hard
+   cutoff, the bottom fades into the card's own background color
+   (supplied per-card via --card-fade, since each note has a
+   different pastel) so a truncated note reads as "more below" rather
+   than looking abruptly chopped off. */
+.note-card-content {
+  position: relative;
+  max-height: 20rem;
+  overflow: hidden;
+}
+.note-card-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.5rem;
+  background: linear-gradient(to bottom, transparent, var(--card-fade, white));
+  pointer-events: none;
+  border-radius: 0 0 1rem 1rem;
+}
 @keyframes icon-pop {
   from { transform: scale(0.6); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
 .icon-pop {
   animation: icon-pop 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Card controls (menu, hide toggle, pin indicator): on a real
+   pointing device these stay barely-visible until hover, same as
+   before. On a touch-only device, `hover`/`group-hover` never fire at
+   all (Tailwind's hover: variant is scoped to `@media (hover: hover)`
+   specifically to avoid sticky-hover-after-tap on touch), which meant
+   these sat at opacity:0 permanently — invisible, with no other way
+   to reach them (the hide toggle in particular has no path through
+   the opened-note view). Default to visible-but-muted so touch
+   devices always see them; only devices with real hover get the
+   fade-until-hover treatment. */
+.card-controls {
+  opacity: 0.55;
+}
+@media (hover: hover) and (pointer: fine) {
+  .card-controls {
+    opacity: 0;
+    transition: opacity 200ms;
+  }
+  .group:hover .card-controls {
+    opacity: 0.4;
+  }
+  .card-controls:hover {
+    opacity: 1;
+  }
+}
+.card-controls.is-open {
+  opacity: 1;
+}
+
+.card-pin-indicator {
+  opacity: 0.55;
+}
+@media (hover: hover) and (pointer: fine) {
+  .card-pin-indicator {
+    opacity: 0;
+    transition: opacity 200ms;
+  }
+  .group:hover .card-pin-indicator {
+    opacity: 0.7;
+  }
+}
+
+/* Stops the browser's default double-tap-to-zoom from firing on
+   interactive cards (a stray extra tap otherwise reads as "zoom
+   here"), and removes the ~300ms delay some mobile browsers add to a
+   tap while they wait to see if it becomes a double-tap-to-zoom.
+   Panning/scrolling is untouched — only the zoom gesture is disabled. */
+.touch-fast {
+  touch-action: manipulation;
 }

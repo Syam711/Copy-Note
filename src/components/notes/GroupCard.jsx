@@ -15,7 +15,7 @@ const CLICK_DEBOUNCE_MS = 220;
 
 // `members` — this group's own notes, passed down from the page so
 // GroupCard doesn't need its own data-fetching logic.
-export default function GroupCard({ group, members, onOpen, selectionMode = false, selected = false, onToggleSelect }) {
+export default function GroupCard({ group, members, onOpen, selectionMode = false, selected = false, onToggleSelect, onCtrlSelect }) {
   const cardRef = useRef(null);
   const menuRef = useRef(null);
   const clickTimer = useRef(null);
@@ -24,6 +24,7 @@ export default function GroupCard({ group, members, onOpen, selectionMode = fals
 
   const toggleArchive = useGroupsStore((s) => s.toggleArchive);
   const ungroup = useGroupsStore((s) => s.ungroup);
+  const trashGroup = useGroupsStore((s) => s.trashGroup);
   const showToast = useToastStore((s) => s.showToast);
   const user = useAuthStore((s) => s.user);
   const isGuest = useAuthStore((s) => s.status === 'guest');
@@ -57,7 +58,11 @@ export default function GroupCard({ group, members, onOpen, selectionMode = fals
     else handleCopy();
   }, [selectionMode, onToggleSelect, group.id, handleCopy]);
 
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((e) => {
+    if (e.ctrlKey || e.metaKey) {
+      onCtrlSelect?.(group.id);
+      return;
+    }
     if (selectionMode) {
       onToggleSelect(group.id);
       return;
@@ -71,7 +76,7 @@ export default function GroupCard({ group, members, onOpen, selectionMode = fals
       handleCopy();
       clickTimer.current = null;
     }, CLICK_DEBOUNCE_MS);
-  }, [selectionMode, onToggleSelect, group.id, handleCopy]);
+  }, [selectionMode, onToggleSelect, onCtrlSelect, group.id, handleCopy]);
 
   const handleDoubleClick = useCallback(() => {
     clearTimeout(clickTimer.current);
@@ -105,6 +110,13 @@ export default function GroupCard({ group, members, onOpen, selectionMode = fals
     showToast('ungroup', group.title);
   };
 
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    setMenuOpen(false);
+    trashGroup(group.id);
+    showToast('delete', group.title);
+  };
+
   const handleShare = async (e) => {
     e.stopPropagation();
     setMenuOpen(false);
@@ -134,7 +146,7 @@ export default function GroupCard({ group, members, onOpen, selectionMode = fals
       onMouseLeave={() => { tilt.onMouseLeave(); setMenuOpen(false); }}
       onKeyDown={(e) => e.key === 'Enter' && triggerOpen()}
       {...longPressHandlers}
-      className={`group-stack group relative cursor-pointer outline-none ${selected ? 'selected' : ''} ${menuOpen ? 'z-20' : ''}`}
+      className={`touch-fast group-stack group relative cursor-pointer outline-none ${selected ? 'selected' : ''} ${menuOpen ? 'z-20' : ''}`}
     >
       <div className="group-stack-layer group-stack-back-2 bg-stone-100 border border-stone-200" />
       <div className="group-stack-layer group-stack-back-1 bg-white border border-stone-200" />
@@ -161,9 +173,7 @@ export default function GroupCard({ group, members, onOpen, selectionMode = fals
       {!selectionMode && (
         <div
           ref={menuRef}
-          className={`absolute top-2 right-2 z-20 transition-opacity duration-200 ${
-            menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-40 hover:!opacity-100'
-          }`}
+          className={`card-controls absolute top-2 right-2 z-20 ${menuOpen ? 'is-open' : ''}`}
         >
           <button
             type="button"
@@ -183,7 +193,8 @@ export default function GroupCard({ group, members, onOpen, selectionMode = fals
                 label={group.is_archived ? 'Unarchive' : 'Archive'}
                 onClick={handleArchiveToggle}
               />
-              <MenuItem icon="trash" label="Ungroup" tone="danger" onClick={handleUngroup} />
+              <MenuItem icon="undo" label="Ungroup" onClick={handleUngroup} />
+              <MenuItem icon="trash" label="Delete" tone="danger" onClick={handleDelete} />
             </div>
           )}
         </div>

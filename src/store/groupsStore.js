@@ -55,7 +55,6 @@ export const useGroupsStore = create((set, get) => ({
   },
 
   _createGroupWithNotes: async (noteIds, titleOverride) => {
-    if (noteIds.length === 0) return null;
     const { ownerId, isGuest, groups } = get();
     const group = {
       id: crypto.randomUUID(),
@@ -71,7 +70,9 @@ export const useGroupsStore = create((set, get) => ({
     if (!isGuest) {
       groupsApi.insertGroup(group).catch((err) => console.error('Sync failed, will retry next load:', err));
     }
-    await get()._assignNotesToGroup(noteIds, group.id);
+    if (noteIds.length > 0) {
+      await get()._assignNotesToGroup(noteIds, group.id);
+    }
     return group;
   },
 
@@ -133,6 +134,33 @@ export const useGroupsStore = create((set, get) => ({
   renameGroup: (id, title) => get()._updateGroup(id, { title }),
   togglePin: (id, next) => get()._updateGroup(id, { is_pinned: next }),
   toggleArchive: (id, next) => get()._updateGroup(id, { is_archived: next }),
+
+  // Distinct from ungroup(): trashing a group cascades to trash every
+  // active member note too, and restoring cascades the same way in
+  // reverse — a trashed group and its notes move together, unlike
+  // ungroup (which dissolves the group but keeps notes active).
+  trashGroup: async (id) => {
+    await get()._updateGroup(id, { deleted_at: new Date().toISOString() });
+    const notesState = useNotesStore.getState();
+    const members = notesState.notes.filter((n) => n.group_id === id && !n.deleted_at);
+    await Promise.all(members.map((n) => notesState.trashNote(n.id)));
+  },
+
+  restoreGroup: async (id) => {
+    await get()._updateGroup(id, { deleted_at: null });
+    const notesState = useNotesStore.getState();
+    const members = notesState.notes.filter((n) => n.group_id === id && n.deleted_at);
+    await Promise.all(members.map((n) => notesState.restoreNote(n.id)));
+  },
+
+  // Trash page's "delete forever" — takes every member note with it,
+  // the same way trashGroup cascaded them in together.
+  permanentlyDeleteGroup: async (id) => {
+    const notesState = useNotesStore.getState();
+    const members = notesState.notes.filter((n) => n.group_id === id);
+    await Promise.all(members.map((n) => notesState.permanentlyDelete(n.id)));
+    await get()._deleteGroupRow(id);
+  },
 
   // Used inside GroupOpenView's "Remove" action — takes selected
   // member notes back to standalone. If that empties the group of

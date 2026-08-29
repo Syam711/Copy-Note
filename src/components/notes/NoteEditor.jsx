@@ -14,7 +14,12 @@ const TRANSITION_MS = 380;
 // note === null means "creating a new note"; originRect is the
 // clicked card's getBoundingClientRect(), or null when there's no
 // card to grow from (e.g. opening via the "new note" button).
-export default function NoteEditor({ note, originRect, onClose }) {
+// defaultGroupId only applies when creating (note === null) — set
+// when opened via a group's own "Add note" button, so the note is
+// grouped from its very first insert rather than a separate update
+// afterward (same create-pre-grouped pattern used by import, avoids
+// the same class of race).
+export default function NoteEditor({ note, originRect, onClose, defaultGroupId = null }) {
   const [title, setTitle] = useState(note?.title || '');
   const [description, setDescription] = useState(note?.description || '');
   const markdownShortcuts = useMarkdownShortcuts(description, setDescription);
@@ -48,9 +53,9 @@ export default function NoteEditor({ note, originRect, onClose }) {
     if (note) {
       await updateNote(note.id, fields);
     } else if (fields.title?.trim() || fields.description?.trim()) {
-      await createNote(fields);
+      await createNote({ ...fields, group_id: defaultGroupId });
     }
-  }, [note, updateNote, createNote]);
+  }, [note, updateNote, createNote, defaultGroupId]);
 
   const handleClose = useCallback(async () => {
     await persist({ title, description }); // empty notes are discarded inside the store

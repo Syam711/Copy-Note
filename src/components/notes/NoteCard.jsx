@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import Icon from '../icons/Icon';
 import MenuItem from '../shared/MenuItem';
-import { colorForNote } from './noteColors';
+import { colorForNote, hexForNote } from './noteColors';
 import RichDescription from './RichDescription';
 import { displayTitle, copyableText } from '../../utils/noteHelpers';
 import { toggleChecklistLine } from '../../utils/richText';
@@ -21,6 +21,7 @@ export default function NoteCard({
   selectionMode = false,
   selected = false,
   onToggleSelect,
+  onCtrlSelect,
   inGroupView = false,
   onRemoveFromGroup,
 }) {
@@ -86,7 +87,11 @@ export default function NoteCard({
   // A double-click always fires a plain click first. Debouncing the
   // single-click action (rather than checking e.detail) means a
   // genuine double-click never triggers an extra copy.
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((e) => {
+    if (e.ctrlKey || e.metaKey) {
+      onCtrlSelect?.(note.id);
+      return;
+    }
     if (selectionMode) {
       onToggleSelect(note.id);
       return;
@@ -100,7 +105,7 @@ export default function NoteCard({
       handleCopy();
       clickTimer.current = null;
     }, CLICK_DEBOUNCE_MS);
-  }, [selectionMode, onToggleSelect, note.id, handleCopy]);
+  }, [selectionMode, onToggleSelect, onCtrlSelect, note.id, handleCopy]);
 
   const handleDoubleClick = useCallback(() => {
     clearTimeout(clickTimer.current);
@@ -170,7 +175,7 @@ export default function NoteCard({
       onMouseLeave={handleMouseLeave}
       onKeyDown={(e) => e.key === 'Enter' && triggerOpen()}
       {...longPressHandlers}
-      className={`group relative cursor-pointer outline-none ${menuOpen ? 'z-20' : ''}`}
+      className={`touch-fast group relative cursor-pointer outline-none ${menuOpen ? 'z-20' : ''}`}
     >
       {/* The tilt transform lives on this inner box only. A CSS
           `transform` creates its own stacking context — if it were on
@@ -180,28 +185,31 @@ export default function NoteCard({
           box, regardless of its z-index. Keeping the transform one
           level in avoids that entirely. */}
       <div
-        style={tilt.style}
+        style={{ ...tilt.style, '--card-fade': hexForNote(note.id) }}
         className={`tilt-card rounded-2xl p-4 will-change-transform transition-[min-height] duration-300 ease-out ${
           note.is_hidden ? 'min-h-[3rem]' : 'min-h-[9rem]'
         } ${colorForNote(note.id)} ${selected ? 'ring-2 ring-teal-600' : ''}`}
       >
-        {note.title?.trim() && (
-          <p className="font-medium text-stone-800 text-sm mb-1 line-clamp-1 pr-6">{note.title}</p>
-        )}
-        {/* Untitled notes normally show their description styled as a
-            title (see the else-branch below). Hidden, that description
-            is about to collapse away — so this stands in as the title
-            using the same title-or-first-lines text the card would
-            otherwise fall back to. */}
-        {!note.title?.trim() && note.is_hidden && (
-          <p className="font-medium text-stone-800 text-sm mb-1 line-clamp-1 pr-6">{title}</p>
-        )}
-        <div className={`note-description-collapse pr-6 ${note.is_hidden ? 'is-hidden' : ''}`}>
-          <RichDescription
-            description={note.description}
-            interactive={!selectionMode}
-            onToggleChecklist={handleToggleChecklist}
-          />
+        <div className="note-card-content">
+          {note.title?.trim() && (
+            <p className="font-medium text-stone-800 text-sm mb-1 line-clamp-1 pr-6">{note.title}</p>
+          )}
+          {/* Untitled notes normally show their description styled as a
+              title (see the else-branch below). Hidden, that description
+              is about to collapse away — so this stands in as the title
+              using the same title-or-first-lines text the card would
+              otherwise fall back to. */}
+          {!note.title?.trim() && note.is_hidden && (
+            <p className="font-medium text-stone-800 text-sm mb-1 line-clamp-1 pr-6">{title}</p>
+          )}
+          <div className={`note-description-collapse pr-6 ${note.is_hidden ? 'is-hidden' : ''}`}>
+            <RichDescription
+              description={note.description}
+              interactive={!selectionMode}
+              onToggleChecklist={handleToggleChecklist}
+            />
+          </div>
+          <div className="note-card-fade" />
         </div>
       </div>
 
@@ -216,14 +224,16 @@ export default function NoteCard({
         </div>
       )}
       {!selectionMode && note.is_pinned && (
-        <Icon name="pin" size={13} className="absolute top-3 left-3 text-stone-500" />
+        <Icon
+          name="pin"
+          size={12}
+          className="card-pin-indicator absolute top-2 left-2 text-stone-500"
+        />
       )}
 
       {!selectionMode && (
         <div
-          className={`absolute top-2 right-2 flex items-center gap-1 transition-opacity duration-200 ${
-            menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-40 hover:!opacity-100'
-          }`}
+          className={`card-controls absolute top-2 right-2 flex items-center gap-1 ${menuOpen ? 'is-open' : ''}`}
         >
           <button
             type="button"
@@ -251,7 +261,7 @@ export default function NoteCard({
                 {inGroupView ? (
                   <MenuItem
                     icon="close"
-                    label="Remove from group"
+                    label="Remove"
                     onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRemoveFromGroup(note.id); }}
                   />
                 ) : (

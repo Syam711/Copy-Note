@@ -3,6 +3,7 @@ import NoteGrid from '../components/notes/NoteGrid';
 import NoteEditor from '../components/notes/NoteEditor';
 import GroupOpenView from '../components/notes/GroupOpenView';
 import TitleFilter from '../components/notes/TitleFilter';
+import SortControl from '../components/notes/SortControl';
 import BulkActionBar from '../components/notes/BulkActionBar';
 import Icon from '../components/icons/Icon';
 import { useNotesStore } from '../store/notesStore';
@@ -10,7 +11,13 @@ import { useGroupsStore } from '../store/groupsStore';
 import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
 import { useSelection } from '../hooks/useSelection';
-import { filterActive, filterActiveGroups, displayTitle, mergeNotesAndGroups } from '../utils/noteHelpers';
+import {
+  filterActive,
+  filterActiveGroups,
+  displayTitle,
+  mergeNotesAndGroups,
+  sortItems,
+} from '../utils/noteHelpers';
 import { createShare, shareUrl } from '../api/share.api';
 
 export default function Home() {
@@ -23,7 +30,7 @@ export default function Home() {
   const allGroups = useGroupsStore((s) => s.groups);
   const toggleGroupArchive = useGroupsStore((s) => s.toggleArchive);
   const formGroupFromSelection = useGroupsStore((s) => s.formGroupFromSelection);
-  const ungroup = useGroupsStore((s) => s.ungroup);
+  const trashGroup = useGroupsStore((s) => s.trashGroup);
 
   const showToast = useToastStore((s) => s.showToast);
   const user = useAuthStore((s) => s.user);
@@ -32,18 +39,24 @@ export default function Home() {
   const [openNote, setOpenNote] = useState(null);
   const [openGroup, setOpenGroup] = useState(null);
   const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState('modified');
+  const [sortDir, setSortDir] = useState('desc');
   const selection = useSelection();
 
   const items = useMemo(() => {
     const activeNotes = filterActive(allNotes);
     const activeGroups = filterActiveGroups(allGroups);
     const merged = mergeNotesAndGroups(activeNotes, activeGroups, allNotes);
-    if (!query.trim()) return merged;
-    const q = query.trim().toLowerCase();
-    return merged.filter((item) =>
-      item.type === 'note' ? displayTitle(item.note).toLowerCase().includes(q) : item.group.title.toLowerCase().includes(q)
-    );
-  }, [allNotes, allGroups, query]);
+    const filtered = query.trim()
+      ? merged.filter((item) => {
+          const q = query.trim().toLowerCase();
+          return item.type === 'note'
+            ? displayTitle(item.note).toLowerCase().includes(q)
+            : item.group.title.toLowerCase().includes(q);
+        })
+      : merged;
+    return sortItems(filtered, sortBy, sortDir);
+  }, [allNotes, allGroups, query, sortBy, sortDir]);
 
   // Classify the current selection so bulk actions can be enabled per
   // the composition rules worked out in the architecture discussion.
@@ -60,6 +73,15 @@ export default function Home() {
   const mixed = hasNotes && hasGroups;
 
   const plural = (n) => `${n} item${n === 1 ? '' : 's'}`;
+
+  const handleCtrlSelect = (id) => {
+    if (!selection.active) selection.enter();
+    selection.toggle(id);
+  };
+
+  const handleSelectAll = () => {
+    selection.selectAll(items.map((item) => (item.type === 'note' ? item.note.id : item.group.id)));
+  };
 
   // The reverse of 1-click copy: clipboard content becomes a new note
   // immediately, no editor step in between. navigator.clipboard.readText()
@@ -91,23 +113,21 @@ export default function Home() {
     selection.exit();
   };
 
-  // Notes-only -> trash them. Groups-only -> ungroup them. Mixed is
-  // unreachable here (the button isn't rendered), but guarded anyway.
+  // Notes and groups can now be trashed together — a trashed group
+  // cascades to trash its own member notes (see groupsStore.trashGroup),
+  // so this is safe regardless of composition. Ungrouping (dissolve,
+  // keep notes active) is still available, just moved to each group's
+  // own menu instead of the bulk bar — "Delete" here always means
+  // "trash," never "dissolve."
   const handleBulkDelete = () => {
-    if (mixed) return;
-    if (hasGroups) {
-      selectedGroupIds.forEach((id) => ungroup(id));
-      showToast('ungroup', plural(selectedGroupIds.length));
-    } else {
-      selectedNoteIds.forEach((id) => trashNote(id));
-      showToast('delete', plural(selectedNoteIds.length));
-    }
+    selectedNoteIds.forEach((id) => trashNote(id));
+    selectedGroupIds.forEach((id) => trashGroup(id));
+    showToast('delete', plural(selection.count));
     selection.exit();
   };
 
   // A single group, or any number of individual notes — never mixed,
-  // never multiple groups. See handleBulkShare's caller for how the
-  // button itself is conditionally rendered to match this.
+  // never multiple groups.
   const handleBulkShare = async () => {
     if (isGuest) {
       showToast('shareRequiresAccount');
@@ -134,7 +154,7 @@ export default function Home() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-      <div className="flex items-center gap-2 mb-6">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
         <button
           type="button"
           onClick={() => setOpenNote({ note: null, rect: null })}
@@ -151,6 +171,7 @@ export default function Home() {
           <Icon name="paste" size={16} />
         </button>
         <TitleFilter query={query} onQueryChange={setQuery} />
+        <SortControl sortBy={sortBy} sortDir={sortDir} onChange={(by, dir) => { setSortBy(by); setSortDir(dir); }} />
         <button
           type="button"
           onClick={selection.active ? selection.exit : selection.enter}
@@ -163,6 +184,17 @@ export default function Home() {
         </button>
       </div>
 
+      {selection.active && (
+        <div className="flex items-center gap-3 mb-3 text-sm">
+          <button type="button" onClick={handleSelectAll} className="text-teal-700 hover:underline">
+            Select all
+          </button>
+          <button type="button" onClick={selection.clear} className="text-stone-500 hover:underline">
+            Deselect all
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-stone-400 text-sm">Loading your notes…</p>
       ) : (
@@ -173,6 +205,7 @@ export default function Home() {
           selectionMode={selection.active}
           selectedIds={selection.selectedIds}
           onToggleSelect={selection.toggle}
+          onCtrlSelect={handleCtrlSelect}
           emptyMessage={query ? 'Nothing matches that title.' : "No notes yet — click 'Take a note…' to add one."}
         />
       )}
@@ -188,8 +221,7 @@ export default function Home() {
         count={selection.count}
         onArchive={handleBulkArchive}
         onGroup={handleBulkGroup}
-        onDelete={mixed ? undefined : handleBulkDelete}
-        deleteLabel={hasGroups && !hasNotes ? 'Ungroup' : 'Delete'}
+        onDelete={handleBulkDelete}
         onShare={!mixed && selectedGroupIds.length <= 1 ? handleBulkShare : undefined}
         onCancel={selection.exit}
       />

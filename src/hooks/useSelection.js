@@ -11,6 +11,15 @@ export function useSelection() {
     setSelectedIds(new Set());
   }, []);
 
+  // Distinct from exit() — clears the selection but stays in
+  // selection mode, for a "Deselect all" action.
+  const clear = useCallback(() => setSelectedIds(new Set()), []);
+
+  const selectAll = useCallback((ids) => {
+    setActive(true);
+    setSelectedIds(new Set(ids));
+  }, []);
+
   const toggle = useCallback((id) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -20,5 +29,5 @@ export function useSelection() {
     });
   }, []);
 
-  return { active, selectedIds, enter, exit, toggle, count: selectedIds.size };
+  return { active, selectedIds, enter, exit, clear, selectAll, toggle, count: selectedIds.size };
 }

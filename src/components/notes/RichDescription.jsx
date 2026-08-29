@@ -24,11 +24,15 @@ export default function RichDescription({ description, onToggleChecklist, intera
                   e.stopPropagation();
                   onToggleChecklist?.(i);
                 }}
-                className={`mt-[3px] w-3.5 h-3.5 shrink-0 rounded-sm border flex items-center justify-center ${
-                  parsed.checked ? 'bg-teal-600 border-teal-600' : 'border-stone-400 bg-white/60'
-                }`}
+                className="shrink-0 flex items-center justify-center w-6 h-6 -my-1 -ml-1 touch-fast"
               >
-                {parsed.checked && <Icon name="check" size={10} className="text-white" />}
+                <span
+                  className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center ${
+                    parsed.checked ? 'bg-teal-600 border-teal-600' : 'border-stone-400 bg-white/60'
+                  }`}
+                >
+                  {parsed.checked && <Icon name="check" size={10} className="text-white" />}
+                </span>
               </button>
               <span className={`text-sm leading-relaxed ${parsed.checked ? 'line-through text-stone-400' : 'text-stone-700'}`}>
                 {parsed.text || '\u00A0'}

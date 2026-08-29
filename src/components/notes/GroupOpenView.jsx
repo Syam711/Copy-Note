@@ -27,6 +27,7 @@ export default function GroupOpenView({ group, originRect, onClose }) {
   const renameGroup = useGroupsStore((s) => s.renameGroup);
   const toggleArchive = useGroupsStore((s) => s.toggleArchive);
   const ungroup = useGroupsStore((s) => s.ungroup);
+  const trashGroup = useGroupsStore((s) => s.trashGroup);
   const removeNotesFromGroup = useGroupsStore((s) => s.removeNotesFromGroup);
   const formGroupFromSelection = useGroupsStore((s) => s.formGroupFromSelection);
   const showToast = useToastStore((s) => s.showToast);
@@ -69,6 +70,14 @@ export default function GroupOpenView({ group, originRect, onClose }) {
     setMenuOpen(false);
     ungroup(group.id);
     showToast('ungroup', group.title);
+    setPhase('exit');
+    setTimeout(onClose, TRANSITION_MS);
+  };
+
+  const handleDelete = () => {
+    setMenuOpen(false);
+    trashGroup(group.id);
+    showToast('delete', group.title);
     setPhase('exit');
     setTimeout(onClose, TRANSITION_MS);
   };
@@ -166,7 +175,8 @@ export default function GroupOpenView({ group, originRect, onClose }) {
                     label={group.is_archived ? 'Unarchive' : 'Archive'}
                     onClick={handleArchiveToggle}
                   />
-                  <MenuItem icon="trash" label="Ungroup" tone="danger" onClick={handleUngroup} />
+                  <MenuItem icon="undo" label="Ungroup" onClick={handleUngroup} />
+                  <MenuItem icon="trash" label="Delete" tone="danger" onClick={handleDelete} />
                 </div>
               )}
             </div>
@@ -180,24 +190,43 @@ export default function GroupOpenView({ group, originRect, onClose }) {
           className="flex-1 overflow-y-auto px-4 pb-4 pt-3 transition-opacity"
           style={{ opacity: phase === 'open' ? 1 : 0, transitionDelay: phase === 'open' ? '150ms' : '0ms' }}
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-stone-400">{members.length} note{members.length === 1 ? '' : 's'}</span>
-            {members.length > 0 && (
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <span className="text-xs text-stone-400 shrink-0">{members.length} note{members.length === 1 ? '' : 's'}</span>
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={selection.active ? selection.exit : selection.enter}
-                aria-label={selection.active ? 'Exit selection' : 'Select notes'}
-                className={`p-2 rounded-full border ${
-                  selection.active ? 'bg-teal-600 border-teal-600 text-white' : 'border-stone-200 bg-white text-stone-500 hover:bg-stone-100'
-                }`}
+                onClick={() => setOpenNote({ note: null, rect: null })}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs border border-stone-200 bg-white text-stone-600 hover:bg-stone-100"
               >
-                <Icon name="select" size={14} />
+                <Icon name="edit" size={12} />
+                Add note
               </button>
-            )}
+              {members.length > 0 && (
+                <button
+                  type="button"
+                  onClick={selection.active ? selection.exit : selection.enter}
+                  aria-label={selection.active ? 'Exit selection' : 'Select notes'}
+                  className={`p-2 rounded-full border ${
+                    selection.active ? 'bg-teal-600 border-teal-600 text-white' : 'border-stone-200 bg-white text-stone-500 hover:bg-stone-100'
+                  }`}
+                >
+                  <Icon name="select" size={14} />
+                </button>
+              )}
+            </div>
           </div>
 
           {members.length === 0 ? (
-            <p className="text-stone-400 text-sm text-center mt-8">No notes left in this group.</p>
+            <div className="text-center mt-8">
+              <p className="text-stone-400 text-sm mb-3">No notes left in this group.</p>
+              <button
+                type="button"
+                onClick={() => setOpenNote({ note: null, rect: null })}
+                className="text-teal-700 text-sm hover:underline"
+              >
+                Add the first one
+              </button>
+            </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" style={{ perspective: '900px' }}>
               {members.map((note) => (
@@ -223,7 +252,7 @@ export default function GroupOpenView({ group, originRect, onClose }) {
               <button type="button" onClick={handleBulkRegroup} aria-label="Group into new group" className="p-2 rounded-full hover:bg-stone-700">
                 <Icon name="group" size={16} />
               </button>
-              <button type="button" onClick={handleBulkRemove} aria-label="Remove from group" className="p-2 rounded-full hover:bg-stone-700">
+              <button type="button" onClick={handleBulkRemove} aria-label="Remove" className="p-2 rounded-full hover:bg-stone-700">
                 <Icon name="undo" size={16} />
               </button>
               <button type="button" onClick={selection.exit} aria-label="Cancel" className="p-2 rounded-full hover:bg-stone-700">
@@ -235,7 +264,7 @@ export default function GroupOpenView({ group, originRect, onClose }) {
       </div>
 
       {openNote && (
-        <NoteEditor note={openNote.note} originRect={openNote.rect} onClose={() => setOpenNote(null)} />
+        <NoteEditor note={openNote.note} originRect={openNote.rect} onClose={() => setOpenNote(null)} defaultGroupId={group.id} />
       )}
     </div>
   );

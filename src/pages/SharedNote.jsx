@@ -43,17 +43,26 @@ export default function SharedNote() {
   // anything else a guest creates) or a signed-in account — whichever
   // owns this browser session already, via notesStore/groupsStore
   // being initialized the same way on every page, not just the main app.
+  //
+  // Group creation happens FIRST, independent of any note — then each
+  // note is created with group_id already set. Doing it the other way
+  // (create notes, then update their group_id afterward) raced two
+  // unordered network calls for the same row: if the group_id update
+  // reached the server before the insert did, it silently matched zero
+  // rows and the note came back ungrouped. Setting group_id at
+  // creation time means there's only ever one write per note, so
+  // there's nothing left to race.
   const handleImport = async () => {
     setImporting(true);
     try {
-      const created = [];
+      let groupId = null;
+      if (share.group_title) {
+        const group = await createGroupFromNotes([], share.group_title);
+        groupId = group.id;
+      }
       for (const note of share.notes) {
         // eslint-disable-next-line no-await-in-loop
-        const result = await createNote({ title: note.title, description: note.description });
-        if (result) created.push(result);
-      }
-      if (share.group_title && created.length > 0) {
-        await createGroupFromNotes(created.map((n) => n.id), share.group_title);
+        await createNote({ title: note.title, description: note.description, group_id: groupId });
       }
       showToast('import', label);
       setImported(true);
