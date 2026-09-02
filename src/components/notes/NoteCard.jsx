@@ -11,6 +11,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useLongPress } from '../../hooks/useLongPress';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTilt } from '../../hooks/useTilt';
+import { useFixedMenuPosition } from '../../hooks/useFixedMenuPosition';
 import { createShare, shareUrl } from '../../api/share.api';
 
 const CLICK_DEBOUNCE_MS = 220; // gives a second click time to arrive before treating the first as final
@@ -28,12 +29,17 @@ export default function NoteCard({
   const cardRef = useRef(null);
   const menuRef = useRef(null);
   const clickTimer = useRef(null);
+  const contentRef = useRef(null);
   const tilt = useTilt();
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const { buttonRef: menuButtonRef, style: menuStyle } = useFixedMenuPosition(menuOpen, closeMenu);
+  const [isOverflowing, setIsOverflowing] = useState(false);
 
   const trashNote = useNotesStore((s) => s.trashNote);
   const toggleArchive = useNotesStore((s) => s.toggleArchive);
   const toggleHidden = useNotesStore((s) => s.toggleHidden);
+  const togglePin = useNotesStore((s) => s.togglePin);
   const updateNote = useNotesStore((s) => s.updateNote);
   const showToast = useToastStore((s) => s.showToast);
   const user = useAuthStore((s) => s.user);
@@ -41,6 +47,21 @@ export default function NoteCard({
 
   useClickOutside(menuRef, () => setMenuOpen(false), menuOpen);
   useEffect(() => () => clearTimeout(clickTimer.current), []);
+
+  // The fade overlay is a fixed height, so it should only render when
+  // content actually reaches the max-height cap — rendering it
+  // unconditionally meant a one-line note (much shorter than the
+  // overlay's own height) got visually washed out by a gradient that
+  // extended well above its single line, not just hinting at more
+  // content below it, because there wasn't any more content to hint at.
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el || note.is_hidden) {
+      setIsOverflowing(false);
+      return;
+    }
+    setIsOverflowing(el.scrollHeight > el.clientHeight + 1);
+  }, [note.description, note.title, note.is_hidden]);
 
   const title = displayTitle(note);
 
@@ -190,7 +211,7 @@ export default function NoteCard({
           note.is_hidden ? 'min-h-[3rem]' : 'min-h-[9rem]'
         } ${colorForNote(note.id)} ${selected ? 'ring-2 ring-teal-600' : ''}`}
       >
-        <div className="note-card-content">
+        <div ref={contentRef} className="note-card-content">
           {note.title?.trim() && (
             <p className="font-medium text-stone-800 text-sm mb-1 line-clamp-1 pr-6">{note.title}</p>
           )}
@@ -209,7 +230,7 @@ export default function NoteCard({
               onToggleChecklist={handleToggleChecklist}
             />
           </div>
-          <div className="note-card-fade" />
+          {isOverflowing && <div className="note-card-fade" />}
         </div>
       </div>
 
@@ -223,12 +244,15 @@ export default function NoteCard({
           {selected && <Icon name="check" size={12} className="text-white" />}
         </div>
       )}
-      {!selectionMode && note.is_pinned && (
-        <Icon
-          name="pin"
-          size={12}
-          className="card-pin-indicator absolute top-2 left-2 text-stone-500"
-        />
+      {!selectionMode && (
+        <button
+          type="button"
+          aria-label={note.is_pinned ? 'Unpin note' : 'Pin note'}
+          onClick={(e) => { e.stopPropagation(); togglePin(note.id, !note.is_pinned); }}
+          className={`card-controls absolute top-2 left-2 p-1.5 rounded-full bg-white/70 hover:bg-white ${note.is_pinned ? 'is-open text-teal-600' : 'text-stone-600'}`}
+        >
+          <Icon name="pin" size={13} />
+        </button>
       )}
 
       {!selectionMode && (
@@ -246,6 +270,7 @@ export default function NoteCard({
 
           <div ref={menuRef} className="relative">
             <button
+              ref={menuButtonRef}
               type="button"
               aria-label="Note options"
               onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
@@ -254,8 +279,8 @@ export default function NoteCard({
               <Icon name="more" size={15} />
             </button>
 
-            {menuOpen && (
-              <div className="absolute top-9 right-0 w-40 rounded-xl bg-white shadow-lg border border-stone-200 py-1 text-sm z-10">
+            {menuOpen && menuStyle && (
+              <div style={menuStyle} className="w-40 rounded-xl bg-white shadow-lg border border-stone-200 py-1 text-sm z-50">
                 <MenuItem icon="edit" label="Edit" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); triggerOpen(); }} />
                 <MenuItem icon="share" label="Share" onClick={handleShare} />
                 {inGroupView ? (

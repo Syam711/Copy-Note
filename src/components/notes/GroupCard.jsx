@@ -2,25 +2,24 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import Icon from '../icons/Icon';
 import MenuItem from '../shared/MenuItem';
 import { colorForNote } from './noteColors';
-import { copyableText } from '../../utils/noteHelpers';
 import { useGroupsStore } from '../../store/groupsStore';
 import { useToastStore } from '../../store/toastStore';
 import { useAuthStore } from '../../store/authStore';
 import { useLongPress } from '../../hooks/useLongPress';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTilt } from '../../hooks/useTilt';
+import { useFixedMenuPosition } from '../../hooks/useFixedMenuPosition';
 import { createShare, shareUrl } from '../../api/share.api';
-
-const CLICK_DEBOUNCE_MS = 220;
 
 // `members` — this group's own notes, passed down from the page so
 // GroupCard doesn't need its own data-fetching logic.
 export default function GroupCard({ group, members, onOpen, selectionMode = false, selected = false, onToggleSelect, onCtrlSelect }) {
   const cardRef = useRef(null);
   const menuRef = useRef(null);
-  const clickTimer = useRef(null);
   const tilt = useTilt();
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const { buttonRef: menuButtonRef, style: menuStyle } = useFixedMenuPosition(menuOpen, closeMenu);
 
   const toggleArchive = useGroupsStore((s) => s.toggleArchive);
   const ungroup = useGroupsStore((s) => s.ungroup);
@@ -30,7 +29,6 @@ export default function GroupCard({ group, members, onOpen, selectionMode = fals
   const isGuest = useAuthStore((s) => s.status === 'guest');
 
   useClickOutside(menuRef, () => setMenuOpen(false), menuOpen);
-  useEffect(() => () => clearTimeout(clickTimer.current), []);
 
   const triggerOpen = useCallback(() => {
     if (selectionMode) {
@@ -41,22 +39,13 @@ export default function GroupCard({ group, members, onOpen, selectionMode = fals
     onOpen(group, rect);
   }, [selectionMode, onToggleSelect, group, onOpen]);
 
-  // Copying a group copies every member note, one per paragraph — the
-  // natural extension of 1-click-copy to a container of notes.
-  const handleCopy = useCallback(async () => {
-    const text = members.map(copyableText).join('\n\n');
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // toast still fires below regardless
-    }
-    showToast('copy', group.title);
-  }, [members, group.title, showToast]);
-
+  // Copying a whole group isn't supported — only individual notes can
+  // be copied, whether standalone or from inside an opened group. So
+  // unlike NoteCard, a group's primary tap/click gesture has nothing
+  // to fall back to outside of selection mode; it's simply a no-op.
   const handlePrimaryTap = useCallback(() => {
     if (selectionMode) onToggleSelect(group.id);
-    else handleCopy();
-  }, [selectionMode, onToggleSelect, group.id, handleCopy]);
+  }, [selectionMode, onToggleSelect, group.id]);
 
   const handleClick = useCallback((e) => {
     if (e.ctrlKey || e.metaKey) {
@@ -65,22 +54,10 @@ export default function GroupCard({ group, members, onOpen, selectionMode = fals
     }
     if (selectionMode) {
       onToggleSelect(group.id);
-      return;
     }
-    if (clickTimer.current) {
-      clearTimeout(clickTimer.current);
-      clickTimer.current = null;
-      return;
-    }
-    clickTimer.current = setTimeout(() => {
-      handleCopy();
-      clickTimer.current = null;
-    }, CLICK_DEBOUNCE_MS);
-  }, [selectionMode, onToggleSelect, onCtrlSelect, group.id, handleCopy]);
+  }, [selectionMode, onToggleSelect, onCtrlSelect, group.id]);
 
   const handleDoubleClick = useCallback(() => {
-    clearTimeout(clickTimer.current);
-    clickTimer.current = null;
     triggerOpen();
   }, [triggerOpen]);
 
@@ -176,6 +153,7 @@ export default function GroupCard({ group, members, onOpen, selectionMode = fals
           className={`card-controls absolute top-2 right-2 z-20 ${menuOpen ? 'is-open' : ''}`}
         >
           <button
+            ref={menuButtonRef}
             type="button"
             aria-label="Group options"
             onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
@@ -184,8 +162,8 @@ export default function GroupCard({ group, members, onOpen, selectionMode = fals
             <Icon name="more" size={15} />
           </button>
 
-          {menuOpen && (
-            <div className="absolute top-9 right-0 w-36 rounded-xl bg-white shadow-lg border border-stone-200 py-1 text-sm">
+          {menuOpen && menuStyle && (
+            <div style={menuStyle} className="w-36 rounded-xl bg-white shadow-lg border border-stone-200 py-1 text-sm z-50">
               <MenuItem icon="edit" label="Open" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); triggerOpen(); }} />
               <MenuItem icon="share" label="Share" onClick={handleShare} />
               <MenuItem

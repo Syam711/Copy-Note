@@ -66,25 +66,18 @@
   .group:hover .card-controls {
     opacity: 0.4;
   }
+  /* !important is load-bearing here, not decoration: without it this
+     loses to `.group:hover .card-controls` on specificity (3 class-
+     level selectors vs. 2) even though it's the more specific INTENT
+     — hovering the control directly should always win over the
+     ambient group-hover state, and does happen at the same time as
+     it (hovering a child triggers :hover on its ancestors too). */
   .card-controls:hover {
-    opacity: 1;
+    opacity: 1 !important;
   }
 }
 .card-controls.is-open {
-  opacity: 1;
-}
-
-.card-pin-indicator {
-  opacity: 0.55;
-}
-@media (hover: hover) and (pointer: fine) {
-  .card-pin-indicator {
-    opacity: 0;
-    transition: opacity 200ms;
-  }
-  .group:hover .card-pin-indicator {
-    opacity: 0.7;
-  }
+  opacity: 1 !important;
 }
 
 /* Stops the browser's default double-tap-to-zoom from firing on
