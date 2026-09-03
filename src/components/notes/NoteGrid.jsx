@@ -40,12 +40,12 @@ export default function NoteGrid({
   }
 
   return (
-    <div
-      className="columns-2 sm:columns-3 lg:columns-4 gap-4"
-      style={{ perspective: '900px' }} // shared 3D context so every card's tilt reads consistently
-    >
+    <div className="columns-2 sm:columns-3 lg:columns-4 gap-4">
       {items.map((item) => (
-        <div key={item.type === 'group' ? item.group.id : item.note.id} className="break-inside-avoid mb-4">
+        <div
+          key={item.type === 'group' ? item.group.id : item.note.id}
+          className="break-inside-avoid mb-4"
+        >
           {item.type === 'group' ? (
             <GroupCard
               group={item.group}
